@@ -8,6 +8,7 @@ from jaxtyping import Float, Int
 import numpy.typing as npt
 import torch
 from torch import Tensor
+from cs336_basics.pretokenization_example import get_freq_pre_tokenization
 
 
 def run_linear(
@@ -589,4 +590,100 @@ def run_train_bpe(
                 representing that <token1> was merged with <token2>.
                 Merges are ordered by order of creation.
     """
-    raise NotImplementedError
+    # vocab initialization
+    vocab : dict[int, bytes] = {i: bytes([i]) for i in range(256)}
+    curr_vocab_size : int = 256
+    
+    # add special_tokens to vocab
+    for special_t in special_tokens:
+        vocab[curr_vocab_size] = special_t.encode('utf-8')
+        curr_vocab_size += 1
+
+    # pre-tokenization: pre-tokenized bytes -> counts
+    freq_pre_tokenization : dict[tuple[bytes], int]= get_freq_pre_tokenization(input_path, 8, special_tokens)
+
+    # merge
+    merges : list[tuple[bytes, bytes]] = list()
+    counts : dict[tuple[bytes], int] = dict()
+    bytes_appearance_in_pre_tokenization : dict[tuple[bytes], set[tuple[bytes]]]= dict()
+
+    ## initialize counts based on freq_pre_tokenization
+    for key in freq_pre_tokenization:
+        if len(key) < 2: continue
+        for i in range(len(key)-1):
+            b = (key[i], key[i+1])
+
+            if b not in bytes_appearance_in_pre_tokenization:
+                bytes_appearance_in_pre_tokenization[b] = set()
+            bytes_appearance_in_pre_tokenization[b].add(key)
+
+            if b not in counts:
+                counts[b] = 0
+            counts[b] += freq_pre_tokenization[key]
+
+    while curr_vocab_size < vocab_size:
+        ## find the successive pair(s) of bytes with largest counts
+        max_count = max(counts.values())
+        candidates = [k for k in counts if counts[k]==max_count]
+        merge = max(candidates)
+
+        ## update merges and vocab
+        merges.append(merge)
+        merged_token = b"".join(merge)
+        vocab[curr_vocab_size] = merged_token
+        curr_vocab_size += 1
+
+        ## update freq_pre_tokenization, counts, bytes_appearance_in_pre_tokenization
+        ### get new_key: greedy perform 'merge' in each pre-tokenization key
+        pre_tokenization_keys_to_update = list(bytes_appearance_in_pre_tokenization[merge])
+        for old_key in pre_tokenization_keys_to_update:
+            new_key = old_key
+            
+            ### need to scan until there is no 'merge' in new_key
+            ### handle cases like merge=(b'e', b'e') in (b'e', b'e', b'e', b'e') -> new_key=(b'ee', b'ee')
+            while True:
+                found = False
+
+                for i, b in enumerate(new_key):
+                    if b == merge[0] and i < len(new_key)-1 and new_key[i+1] == merge[1]:
+                        ### (new_key[i], new_key[i+1]) is 'merge'
+                        found = True
+                        ### new_key in freq_pre_tokenization
+                        new_key = new_key[:i] + tuple([merged_token]) + new_key[i+2:]
+                        break
+
+                if not found:
+                    break
+
+            ### update counts and bytes_appearance_in_pre_tokenization
+            if len(old_key) >= 2:
+                for i in range(len(old_key)-1):
+                    b = (old_key[i], old_key[i+1])
+                    ### subtract counts by freq_pre_tokenization[old_key] for successive pair of bytes in old_key
+                    counts[b] -= freq_pre_tokenization[old_key]
+                    ### remove old_key in bytes_appearance_in_pre_tokenization's values
+                    if b in bytes_appearance_in_pre_tokenization:
+                        if old_key in bytes_appearance_in_pre_tokenization[b]:
+                            bytes_appearance_in_pre_tokenization[b].remove(old_key)
+            
+            if len(new_key) >= 2:
+                for i in range(len(new_key)-1):
+                    b = (new_key[i], new_key[i+1])
+                    ### 
+                    if b not in counts:
+                        counts[b] = 0
+                    counts[b] += freq_pre_tokenization[old_key]
+                    ### add successive pair of bytes in new_key to bytes_appearance_in_pre_tokenization
+                    if b not in bytes_appearance_in_pre_tokenization:
+                        bytes_appearance_in_pre_tokenization[b] = set()
+                    bytes_appearance_in_pre_tokenization[b].add(new_key)
+
+            ### update freq_pre_tokenization
+            freq_pre_tokenization[new_key] = freq_pre_tokenization[old_key]
+            del freq_pre_tokenization[old_key]
+
+        ### delete bytes_appearance_in_pre_tokenization, counts for merge
+        del bytes_appearance_in_pre_tokenization[merge]
+        del counts[merge]
+
+    return vocab, merges
