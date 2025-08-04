@@ -17,7 +17,7 @@ if __name__ == '__main__':
     input_path = "./downloads/data/owt_train.txt"
     vocab, merges = run_train_bpe(
         input_path=input_path,
-        vocab_size=10_000,
+        vocab_size=32_000,
         special_tokens=["<|endoftext|>"],
     )
 
@@ -33,21 +33,21 @@ if __name__ == '__main__':
 
 
 # /usr/bin/time -l uv run train_bpe_expts_owt.py                                                                                                                                                            1 ✘ │ base  │ at 22:35:58 
-#      2216.12 real      3942.91 user       140.09 sys
-#          10225008640  maximum resident set size
-#                    0  average shared memory size
-#                    0  average unshared data size
-#                    0  average unshared stack size
-#             26558473  page reclaims
-#                 2293  page faults
-#                    0  swaps
-#                    0  block input operations
-#                    0  block output operations
-#                    1  messages sent
-#                    1  messages received
-#                    1  signals received
-#               896996  voluntary context switches
-#              3116475  involuntary context switches
-#            106562640  instructions retired
-#             49805340  cycles elapsed
-#             10486592  peak memory footprint
+    #  8027.54 real      9776.08 user       127.78 sys
+    #      10387734528  maximum resident set size
+    #                0  average shared memory size
+    #                0  average unshared data size
+    #                0  average unshared stack size
+    #         26505253  page reclaims
+    #             4933  page faults
+    #                0  swaps
+    #                0  block input operations
+    #                0  block output operations
+    #                1  messages sent
+    #                1  messages received
+    #                1  signals received
+    #           906385  voluntary context switches
+    #          3462555  involuntary context switches
+    #        157167906  instructions retired
+    #         85398807  cycles elapsed
+    #         10404672  peak memory footprint
