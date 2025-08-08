@@ -3,7 +3,6 @@ import json
 import regex as re
 from collections.abc import Iterable, Iterator
 from tests.common import gpt2_bytes_to_unicode
-from cs336_basics.pretokenization_example import find_chunk_boundaries
 
 
 class Tokenizer(object):
@@ -26,6 +25,7 @@ class Tokenizer(object):
         self.vocab_int_to_bytes = vocab
         self.vocab_bytes_to_int = {v: k for k, v in vocab.items()}
         self.merges = merges
+        self.merges_rank = {merge: i for i, merge in enumerate(merges)}
         self.special_tokens = special_tokens
 
 
@@ -74,13 +74,19 @@ class Tokenizer(object):
         output = list()
         for part in parts:
             if self.special_tokens and part in self.special_tokens:
-                output += [self.vocab_bytes_to_int[part.encode("utf-8")]]
+                output.append(self.vocab_bytes_to_int[part.encode("utf-8")])
             else:
                 for pre_tokenized_token in self.pre_tokenize(part): # step 1: pre-tokenize
-                    pre_tokenized_token_bytes_tuple = self.apply_merges_on_pre_tokenized_token(pre_tokenized_token)
-                    # step 3: map to int
-                    pre_tokenized_token_encoded = [self.vocab_bytes_to_int[k] for k in pre_tokenized_token_bytes_tuple]
-                    output += pre_tokenized_token_encoded
+                    pre_tokenized_token_bytes = pre_tokenized_token.group().encode("utf-8")
+                    
+                    if pre_tokenized_token_bytes in self.vocab_bytes_to_int:
+                        output.append(self.vocab_bytes_to_int[pre_tokenized_token_bytes])
+                    else:
+                        # step 2: apply the merges
+                        pre_tokenized_token_bytes_tuple = self.apply_merges_on_pre_tokenized_token(pre_tokenized_token_bytes)
+                        # step 3: map to int
+                        for k in pre_tokenized_token_bytes_tuple:
+                            output.append(self.vocab_bytes_to_int[k])
         return output
 
 
@@ -95,35 +101,52 @@ class Tokenizer(object):
         return b"".join([self.vocab_int_to_bytes[k] for k in ids]).decode('utf-8', errors='replace')
     
 
-    def pre_tokenize(self, text: str) -> Iterator[str]:
+    def pre_tokenize(self, text: str) -> Iterator[re.Match]:
         return re.finditer(self.PAT, text)
     
     
-    def apply_merges_on_pre_tokenized_token(self, pre_tokenized_token: str) -> tuple[bytes]:
-        pre_tokenized_token_bytes = pre_tokenized_token.group().encode("utf-8")
-        pre_tokenized_token_bytes_tuple = tuple([
-            pre_tokenized_token_bytes[i:i+1] for i in range(len(pre_tokenized_token_bytes))])
-        # step 2: apply the merges
+    def apply_merges_on_pre_tokenized_token(self, pre_tokenized_token_bytes: bytes) -> list[bytes]:
+        pre_tokenized_token_bytes_list = [
+            pre_tokenized_token_bytes[i:i+1] for i in range(len(pre_tokenized_token_bytes))]
+        
+        if len(pre_tokenized_token_bytes_list) == 1:
+            return [pre_tokenized_token_bytes,]
+
         ## find the first matched merge and apply, until no match can be found
         while True:
-            found = False
-            for merge in self.merges:
-                if merge[0] in pre_tokenized_token_bytes_tuple:
-                    for i, b in enumerate(pre_tokenized_token_bytes_tuple):
-                        if b == merge[0] and \
-                            i < len(pre_tokenized_token_bytes_tuple)-1 and \
-                                pre_tokenized_token_bytes_tuple[i+1] == merge[1]:
-                            found = True
-                            pre_tokenized_token_bytes_tuple = \
-                                pre_tokenized_token_bytes_tuple[:i] \
-                                + tuple([b"".join(merge)]) \
-                                + pre_tokenized_token_bytes_tuple[i+2:]
-                            break
-                if found:
-                    break
-            if not found:
+            smallest_rank: int = None
+            merge_to_be_applied: tuple[bytes, bytes] = None
+
+            for i in range(len(pre_tokenized_token_bytes_list) - 1):
+                pair = (pre_tokenized_token_bytes_list[i], pre_tokenized_token_bytes_list[i+1])
+                rank = self.merges_rank.get(pair)
+
+                if rank is not None and (smallest_rank is None or rank < smallest_rank):
+                    merge_to_be_applied = pair
+                    smallest_rank = rank
+
+            if merge_to_be_applied is None:
                 break
-        return pre_tokenized_token_bytes_tuple
+            
+            # apply merge_to_be_applied
+            new_pre_tokenized_token_bytes_list: list[bytes] = list()
+            old_len = len(pre_tokenized_token_bytes_list)
+            i = 0
+            while i < old_len:
+                if i < old_len - 1 and \
+                    pre_tokenized_token_bytes_list[i] == merge_to_be_applied[0] and \
+                        pre_tokenized_token_bytes_list[i+1] == merge_to_be_applied[1]:
+                    new_pre_tokenized_token_bytes_list.append(b"".join(merge_to_be_applied))
+                    i += 2
+                else:
+                    new_pre_tokenized_token_bytes_list.append(pre_tokenized_token_bytes_list[i])
+                    i += 1
+            pre_tokenized_token_bytes_list = new_pre_tokenized_token_bytes_list
+
+            if len(pre_tokenized_token_bytes_list) == 1:
+                break
+
+        return pre_tokenized_token_bytes_list
     
 
 if __name__ == '__main__':
@@ -149,7 +172,7 @@ if __name__ == '__main__':
     # print(tokenizer.decode(tokenizer.encode(input_str)) == input_str)
 
     all_ids = []
-    with open(FIXTURES_PATH / "tinystories_sample.txt") as f:
+    with open(FIXTURES_PATH / "tinystories_sample_5M.txt") as f:
         for _id in tokenizer.encode_iterable(f):
             all_ids.append(_id)
 
