@@ -10,6 +10,7 @@ import torch
 from torch import Tensor
 from cs336_basics.pretokenization_example import get_freq_pre_tokenization
 from cs336_basics.tokenizer import Tokenizer
+from cs336_basics.model.linear import Linear
 
 
 def run_linear(
@@ -30,8 +31,9 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-
-    raise NotImplementedError
+    linear_layer = Linear(d_in, d_out)
+    linear_layer.load_state_dict({"weights": weights})
+    return linear_layer(in_features)
 
 
 def run_embedding(
