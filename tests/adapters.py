@@ -11,6 +11,7 @@ from torch import Tensor
 from cs336_basics.pretokenization_example import get_freq_pre_tokenization
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.model.linear import Linear
+from cs336_basics.model.embedding import Embedding
 
 
 def run_linear(
@@ -54,8 +55,9 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
-
-    raise NotImplementedError
+    embedding_layer = Embedding(vocab_size, d_model)
+    embedding_layer.load_state_dict({"embeddings": weights})
+    return embedding_layer(token_ids)
 
 
 def run_swiglu(
