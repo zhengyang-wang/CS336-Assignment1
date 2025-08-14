@@ -13,6 +13,7 @@ from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.model.linear import Linear
 from cs336_basics.model.embedding import Embedding
 from cs336_basics.model.rms_norm import RMSNorm
+from cs336_basics.model.swiglu import SwiGLU
 
 
 def run_linear(
@@ -83,14 +84,13 @@ def run_swiglu(
     Returns:
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
-    # Example:
-    # If your state dict keys match, you can use `load_state_dict()`
-    # swiglu.load_state_dict(weights)
-    # You can also manually assign the weights
-    # swiglu.w1.weight.data = w1_weight
-    # swiglu.w2.weight.data = w2_weight
-    # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    swiglu_layer = SwiGLU(d_model, d_ff)
+    swiglu_layer.load_state_dict({
+        "w1_weight": w1_weight,
+        "w2_weight": w2_weight,
+        "w3_weight": w3_weight,
+    })
+    return swiglu_layer(in_features)
 
 
 def run_scaled_dot_product_attention(
