@@ -20,7 +20,7 @@ def scaled_dot_product_attention(
 
     # apply the mask
     if mask is not None:
-        attn_map_pre_softmax[~mask] -= torch.inf
+        attn_map_pre_softmax = attn_map_pre_softmax.masked_fill(~mask, -torch.inf)
 
     # softmax
     attn_map_after_softmax = softmax(attn_map_pre_softmax, dim=-1)
