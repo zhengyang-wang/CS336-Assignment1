@@ -20,6 +20,7 @@ from cs336_basics.model import (
     scaled_dot_product_attention,
     CausalMultiHeadSelfAttention,
     TransformerBlock,
+    TransformerLM,
 )
 
 
@@ -401,7 +402,28 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    llm = TransformerLM(vocab_size, context_length, num_layers, d_model, num_heads, d_ff, rope_theta)
+    mapped_weights = dict()
+    mapped_weights["token_embeddings.embeddings"] = weights['token_embeddings.weight']
+    for i in range(num_layers):
+        mapped_weights[f"layers.{i}.position_wise_ffn.linear1.weights"] = weights[f'layers.{i}.ffn.w1.weight']
+        mapped_weights[f"layers.{i}.position_wise_ffn.linear2.weights"] = weights[f'layers.{i}.ffn.w2.weight']
+        mapped_weights[f"layers.{i}.position_wise_ffn.linear3.weights"] = weights[f'layers.{i}.ffn.w3.weight']
+        mapped_weights[f"layers.{i}.rmsnorm_ffn.g"] = weights[f'layers.{i}.ln2.weight']
+        mapped_weights[f"layers.{i}.causal_multi_head_self_attn.qkv_proj.weights"] = torch.cat([
+                weights[f'layers.{i}.attn.q_proj.weight'],
+                weights[f'layers.{i}.attn.k_proj.weight'],
+                weights[f'layers.{i}.attn.v_proj.weight'],
+            ], dim=0)
+        mapped_weights[f"layers.{i}.causal_multi_head_self_attn.o_proj.weights"] = weights[f'layers.{i}.attn.output_proj.weight']
+        mapped_weights[f"layers.{i}.rmsnorm_attn.g"] = weights[f'layers.{i}.ln1.weight']
+    mapped_weights["final_rmsnorm.g"] = weights['ln_final.weight']
+    mapped_weights["lm_head.weights"] = weights['lm_head.weight']
+    llm.load_state_dict(mapped_weights)
+    B, S = in_indices.shape
+    token_positions = torch.arange(S, device=in_indices.device)  # (S,)
+    token_positions = token_positions.unsqueeze(0).expand(B, -1) # (B, S)
+    return llm(in_indices, token_positions)
 
 
 def run_rmsnorm(

@@ -9,6 +9,7 @@ from .softmax import softmax
 from .scaled_dot_product_attention import scaled_dot_product_attention
 from .multihead_self_attention import CausalMultiHeadSelfAttention
 from .transformer_block import TransformerBlock
+from .transformer_lm import TransformerLM
 
 __all__ = [
     "Linear",
@@ -20,4 +21,5 @@ __all__ = [
     "scaled_dot_product_attention",
     "CausalMultiHeadSelfAttention",
     "TransformerBlock",
+    "TransformerLM",
 ]
