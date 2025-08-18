@@ -4,6 +4,10 @@ from einops import einsum
 from cs336_basics.model import Linear
 
 
+def SiLU(x: torch.Tensor) -> torch.Tensor:
+    return x * torch.sigmoid(x)
+
+
 class SwiGLU(torch.nn.Module):
     def __init__(
         self,
@@ -20,6 +24,6 @@ class SwiGLU(torch.nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         silu_input = self.linear1(x)
-        silu_output = silu_input * torch.sigmoid(silu_input)
+        silu_output = SiLU(silu_input)
         gated_output = silu_output * self.linear3(x)
         return self.linear2(gated_output)
