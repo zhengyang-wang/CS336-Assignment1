@@ -18,6 +18,7 @@ from cs336_basics.model import (
     RotaryPositionalEmbedding,
     softmax,
     scaled_dot_product_attention,
+    CausalMultiHeadSelfAttention,
 )
 
 
@@ -91,9 +92,9 @@ def run_swiglu(
     """
     swiglu_layer = SwiGLU(d_model, d_ff)
     swiglu_layer.load_state_dict({
-        "w1_weight": w1_weight,
-        "w2_weight": w2_weight,
-        "w3_weight": w3_weight,
+        "linear1.weights": w1_weight,
+        "linear2.weights": w2_weight,
+        "linear3.weights": w3_weight,
     })
     return swiglu_layer(in_features)
 
@@ -150,7 +151,12 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    causal_multi_head_self_attention = CausalMultiHeadSelfAttention(d_model, num_heads)
+    causal_multi_head_self_attention.load_state_dict({
+        "qkv_proj.weights": torch.cat([q_proj_weight, k_proj_weight, v_proj_weight], dim=0),
+        "o_proj.weights": o_proj_weight,
+    })
+    return causal_multi_head_self_attention(in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -190,7 +196,14 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    d_k = int(d_model / num_heads)
+    rope_applier = RotaryPositionalEmbedding(d_k=d_k, theta=theta, max_seq_len=max_seq_len)
+    causal_multi_head_self_attention = CausalMultiHeadSelfAttention(d_model, num_heads, rope_applier)
+    causal_multi_head_self_attention.load_state_dict({
+        "qkv_proj.weights": torch.cat([q_proj_weight, k_proj_weight, v_proj_weight], dim=0),
+        "o_proj.weights": o_proj_weight,
+    })
+    return causal_multi_head_self_attention(in_features, token_positions)
 
 
 def run_rope(
