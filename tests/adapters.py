@@ -10,6 +10,7 @@ import torch
 from torch import Tensor
 from cs336_basics.pretokenization_example import get_freq_pre_tokenization
 from cs336_basics.tokenizer import Tokenizer
+from cs336_basics.data_loader import get_batch
 from cs336_basics.model import (
     Linear,
     Embedding,
@@ -492,7 +493,7 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return get_batch(dataset, batch_size, context_length, device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
