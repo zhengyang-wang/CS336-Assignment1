@@ -16,4 +16,4 @@ def get_batch(
         dataset[starting_index+1 : starting_index+context_length+1]
         for starting_index in sampled_starting_indices
     ])
-    return torch.from_numpy(x).to(device), torch.from_numpy(y).to(device)
+    return torch.from_numpy(x).long().to(device), torch.from_numpy(y).long().to(device)
