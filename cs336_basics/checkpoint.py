@@ -46,7 +46,24 @@ def load_checkpoint(
         int: the previously-serialized number of iterations.
     """
     obj = torch.load(src)
-    model.load_state_dict(obj['model'])
-    if optimizer:
+    
+    # Handle compiled model state dicts with _orig_mod prefix
+    if 'model' in obj:
+        model_state_dict = obj['model']
+        if any(k.startswith('_orig_mod.') for k in model_state_dict.keys()):
+            # Remove _orig_mod. prefix from keys
+            new_state_dict = {}
+            for k, v in model_state_dict.items():
+                if k.startswith('_orig_mod.'):
+                    new_key = k.replace('_orig_mod.', '')
+                    new_state_dict[new_key] = v
+                else:
+                    new_state_dict[k] = v
+            model_state_dict = new_state_dict
+            
+        model.load_state_dict(model_state_dict)
+    
+    if optimizer and 'optimizer' in obj:
         optimizer.load_state_dict(obj['optimizer'])
-    return obj['iteration']
+        
+    return obj.get('iteration', 0)  # Default to 0 if iteration not found
